@@ -72,6 +72,8 @@ void main()
 //	USART1_BRR2 = 0x00;			// reset value is 0
 	USART1_BRR1 = 0x0D;			// 9600 @ 2Mhz
 
+	delay_ms(1);				// for 9600Hz
+
 //	USART1_CR3 &= ~(1 << USART_STOP1) | (1 << USART_STOP2);	// 00: 1 STOP bit
 //								// reset value is already 0, anyway
 	USART1_CR2 = (1 << USART_TEN) | (1 << USART_REN);	// exnable TX and RX
