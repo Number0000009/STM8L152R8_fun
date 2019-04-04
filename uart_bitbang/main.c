@@ -100,6 +100,8 @@ static inline void setup_timer4()
 // set prescaler TIM4_PSCR.PSC[3:0] fq = CK_PSC / 2^(PSC[3:0]
 //	TIM4_PSCR |= 0b1111;
 
+	TIM4_ARR = 0xd0;			// 9600Hz
+
 	TIM4_IER |= 1 << TIM4_UIE;
 	TIM4_EGR |= 1 << TIM4_UG;
 	TIM4_CR1 |= 1 << TIM4_CEN;
@@ -119,10 +121,7 @@ void trap_isr() __trap
 
 void tim4_isr() __interrupt(TIM4_ISR)
 {
-//	PD_ODR ^= 1 << PD4_PIN;			// toggle PD4-pin
 	bitbang('A');
-
-//	TIM4_PSCR |= 0b1111;
 	TIM4_SR = 0;
 }
 
