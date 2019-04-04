@@ -53,7 +53,6 @@
 #define TIM4_TG		6
 #define TIM4_UG		0
 
-
 // Vectors
 #define TIM4_ISR 25	// int25
 
@@ -65,6 +64,16 @@ static inline void delay_ms(uint16_t ms)
 
 	for (i = 0; i < ((F_CPU / 18000UL) * ms); i++)
 		__asm__("nop");
+}
+
+static inline void set_pd4_pin_high()
+{
+	PD_ODR |= 1 << PD4_PIN;
+}
+
+static inline void set_pd4_pin_low()
+{
+	PD_ODR &= ~(1 << PD4_PIN);
 }
 
 static inline void setup()
@@ -90,9 +99,8 @@ static inline void setup()
 	USART1_CR2 = (1 << USART_TEN) | (1 << USART_REN);	// exnable TX and RX
 
 
-	PD_ODR |= 1 << PD4_PIN;			// PD4-pin is high
+	set_pd4_pin_high();
 }
-
 
 static inline void setup_timer4()
 {
@@ -117,23 +125,23 @@ static inline int bitbang(uint8_t c)
 
 	if (i == -1) {
 // 1 start bit
-		PD_ODR &= ~(1 << PD4_PIN);	// reset PD4-pin
+		set_pd4_pin_low();
 		i++;
 		return false;
 	}
 
-	if (c & (1 << i)) {
-		PD_ODR |= 1 << PD4_PIN;		// set PD4-pin
-
-	} else {
-		PD_ODR &= ~(1 << PD4_PIN);	// reset PD4-pin
-	}
+	if (c & (1 << i))
+		set_pd4_pin_high();
+	else
+		set_pd4_pin_low();
 
 	i++;
 	if (i == 9) {
-		PD_ODR |= 1 << PD4_PIN;		// set PD4-pin
+		set_pd4_pin_high();
+
 		TIM4_CR1 &= ~(1 << TIM4_CEN);	// disable TIM4
 		i = -1;
+
 		return true;
 	}
 
