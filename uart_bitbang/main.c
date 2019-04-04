@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdbool.h>
 
 #define F_CPU 2000000UL	// Default is 2MHz
 
@@ -56,7 +57,6 @@
 // Vectors
 #define TIM4_ISR 25	// int25
 
-
 static inline void delay_ms(uint16_t ms)
 {
 // The fuck sdcc -std-c99 doesn't allow
@@ -73,10 +73,10 @@ static inline void setup()
 	CLK_PCKENR1 = 1 << PCKEN_USART1;	// enable clock to USART1
 
 	PD_DDR |= 1 << PD4_PIN;			// output
-	PD_CR1 |= (1 << PD4_PIN);		// push-pull mode
+	PD_CR1 |= 1 << PD4_PIN;			// push-pull mode
 
 	PC_DDR |= 1 << USART_TX_PIN;		// output
-	PC_CR1 |= (1 << USART_TX_PIN);		// push-pull mode
+	PC_CR1 |= 1 << USART_TX_PIN;		// push-pull mode
 
 //	USART1_BRR2 = 0x03;			//
 //	USART1_BRR1 = 0x68;			// 9600 @ 16Mhz
@@ -88,6 +88,9 @@ static inline void setup()
 //	USART1_CR3 &= ~(1 << USART_STOP1) | (1 << USART_STOP2);	// 00: 1 STOP bit
 //								// reset value is already 0, anyway
 	USART1_CR2 = (1 << USART_TEN) | (1 << USART_REN);	// exnable TX and RX
+
+
+	PD_ODR |= 1 << PD4_PIN;			// PD4-pin is high
 }
 
 
@@ -104,14 +107,37 @@ static inline void setup_timer4()
 
 	TIM4_IER |= 1 << TIM4_UIE;
 	TIM4_EGR |= 1 << TIM4_UG;
-	TIM4_CR1 |= 1 << TIM4_CEN;
 
 	__asm__("rim");
 }
 
-static inline void bitbang(uint8_t c)
+static inline int bitbang(uint8_t c)
 {
-	PD_ODR ^= 1 << PD4_PIN;			// toggle PD4-pin
+	static int i = -1;
+
+	if (i == -1) {
+// 1 start bit
+		PD_ODR &= ~(1 << PD4_PIN);	// reset PD4-pin
+		i++;
+		return false;
+	}
+
+	if (c & (1 << i)) {
+		PD_ODR |= 1 << PD4_PIN;		// set PD4-pin
+
+	} else {
+		PD_ODR &= ~(1 << PD4_PIN);	// reset PD4-pin
+	}
+
+	i++;
+	if (i == 9) {
+		PD_ODR |= 1 << PD4_PIN;		// set PD4-pin
+		TIM4_CR1 &= ~(1 << TIM4_CEN);	// disable TIM4
+		i = -1;
+		return true;
+	}
+
+	return false;
 }
 
 void trap_isr() __trap
@@ -119,23 +145,42 @@ void trap_isr() __trap
 	__asm__("jra .");
 }
 
+char str[] = {"AaBbCcDdEeFfGg"};
+
 void tim4_isr() __interrupt(TIM4_ISR)
 {
-	bitbang('A');
+	static int z = 0;
+
+	if (str[z]) {
+		int ret = bitbang(str[z]);
+		if (ret) {
+			z++;
+		}
+	} else {
+		z = 0;
+	}
 	TIM4_SR = 0;
 }
 
-
-
 void main()
 {
+	static int z = 0;
+
 	setup();
 	setup_timer4();
 
 	while (1)
 	{
-		if (USART1_SR & (1 << USART_TXE))
-			USART1_DR = 'A';
+		if (USART1_SR & (1 << USART_TXE)) {
+			if (str[z]) {
+				USART1_DR = str[z++];
+			} else {
+				z = 0;
+			}
+
+		}
+
+		TIM4_CR1 |= 1 << TIM4_CEN;		// enable TIM4
 
 		delay_ms(250);
 	}
